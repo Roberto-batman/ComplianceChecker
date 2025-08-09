@@ -80,6 +80,31 @@
         .results-table tr:nth-child(even) {
             background: #f8f9fa;
         }
+        .control-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .control-row:hover {
+            background-color: #e8f4f8 !important;
+        }
+        .expandable {
+            font-weight: bold;
+        }
+        .expand-icon {
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        .subreq-row {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .subreq-row td {
+            padding-left: 20px;
+            font-size: 0.95em;
+        }
         .status-fully-meets {
             background: #d4edda;
             color: #155724;
@@ -139,13 +164,18 @@
 
         <div id="results" style="display: none;">
             <h3>📊 Compliance Assessment Results</h3>
+            <div id="documentInfo" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                <strong>Document:</strong> <span id="documentTitle"></span>
+            </div>
             <table id="resultsTable" class="results-table">
                 <thead>
                     <tr>
                         <th>Control ID</th>
                         <th>Title</th>
+                        <th>Sub-Requirement</th>
                         <th>Evidence Found</th>
                         <th>Compliance Status</th>
+                        <th>Confidence</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody">
@@ -206,42 +236,168 @@
             const tbody = document.getElementById('resultsBody');
             tbody.innerHTML = '';
             
-            results.forEach(result => {
-                const row = tbody.insertRow();
+            // Display document title
+            if (results.length > 0) {
+                document.getElementById('documentTitle').textContent = results[0].document_title;
+            }
+            
+            results.forEach((result, index) => {
+                // Main control row
+                const mainRow = tbody.insertRow();
+                mainRow.className = 'control-row expandable';
+                mainRow.onclick = () => toggleSubrequirements(index);
                 
-                // Control ID
-                const cellId = row.insertCell(0);
-                cellId.textContent = result.control_id;
+                // Control ID with expand icon
+                const cellId = mainRow.insertCell(0);
+                cellId.innerHTML = `<span class="expand-icon" id="icon-${index}">▶</span>${result.control_id}`;
                 cellId.style.fontWeight = 'bold';
                 
                 // Title
-                const cellTitle = row.insertCell(1);
+                const cellTitle = mainRow.insertCell(1);
                 cellTitle.textContent = result.title;
                 
-                // Evidence Found
-                const cellEvidence = row.insertCell(2);
-                const evidenceDiv = document.createElement('div');
-                evidenceDiv.className = 'evidence-text';
-                evidenceDiv.textContent = result.evidence_found;
-                cellEvidence.appendChild(evidenceDiv);
+                // Sub-Requirement (empty for main row)
+                const cellSubReq = mainRow.insertCell(2);
+                cellSubReq.textContent = `${result.subrequirements.length} sub-requirements`;
+                cellSubReq.style.fontStyle = 'italic';
+                cellSubReq.style.color = '#6c757d';
                 
-                // Compliance Status
-                const cellStatus = row.insertCell(3);
+                // Evidence (summary)
+                const cellEvidence = mainRow.insertCell(3);
+                const totalEvidence = result.subrequirements.reduce((total, sub) => total + sub.evidence_items.length, 0);
+                cellEvidence.textContent = `${totalEvidence} evidence items found`;
+                cellEvidence.style.fontStyle = 'italic';
+                cellEvidence.style.color = '#6c757d';
+                
+                // Overall Compliance Status
+                const cellStatus = mainRow.insertCell(4);
                 const statusSpan = document.createElement('span');
-                statusSpan.textContent = result.compliance_status;
+                statusSpan.textContent = result.overall_compliance_status;
                 
-                if (result.compliance_status === 'Fully Meets') {
+                if (result.overall_compliance_status === 'Fully Meets') {
                     statusSpan.className = 'status-fully-meets';
-                } else if (result.compliance_status === 'Partially Meets') {
+                } else if (result.overall_compliance_status === 'Partially Meets') {
                     statusSpan.className = 'status-partially-meets';
                 } else {
                     statusSpan.className = 'status-does-not-meet';
                 }
                 
                 cellStatus.appendChild(statusSpan);
+                
+                // Overall Confidence
+                const cellConfidence = mainRow.insertCell(5);
+                const confidencePercent = Math.round(result.overall_confidence_score * 100);
+                cellConfidence.textContent = `${confidencePercent}%`;
+                cellConfidence.style.fontWeight = 'bold';
+                
+                if (confidencePercent >= 80) {
+                    cellConfidence.style.color = '#28a745';
+                } else if (confidencePercent >= 60) {
+                    cellConfidence.style.color = '#ffc107';
+                } else {
+                    cellConfidence.style.color = '#dc3545';
+                }
+                
+                // Add sub-requirement rows (initially hidden)
+                result.subrequirements.forEach(subreq => {
+                    const subRow = tbody.insertRow();
+                    subRow.className = `subreq-row subreq-${index}`;
+                    subRow.style.display = 'none';
+                    
+                    // Empty Control ID cell
+                    subRow.insertCell(0);
+                    
+                    // Empty Title cell  
+                    subRow.insertCell(1);
+                    
+                    // Sub-requirement definition
+                    const subReqCell = subRow.insertCell(2);
+                    subReqCell.innerHTML = `<strong>${subreq.subreq_marker}</strong><br><span style="font-size: 0.9em;">${subreq.subreq_definition}</span>`;
+                    
+                    // Evidence for this sub-requirement
+                    const subEvidenceCell = subRow.insertCell(3);
+                    const evidenceDiv = document.createElement('div');
+                    evidenceDiv.className = 'evidence-text';
+                    
+                    if (subreq.evidence_items && subreq.evidence_items.length > 0) {
+                        subreq.evidence_items.forEach(item => {
+                            const evidenceItem = document.createElement('div');
+                            evidenceItem.style.marginBottom = '8px';
+                            evidenceItem.style.padding = '6px';
+                            evidenceItem.style.backgroundColor = '#fff';
+                            evidenceItem.style.border = '1px solid #dee2e6';
+                            evidenceItem.style.borderRadius = '4px';
+                            evidenceItem.style.fontSize = '0.85em';
+                            
+                            evidenceItem.innerHTML = `
+                                <div style="font-weight: bold; color: #007bff; font-size: 0.8em;">
+                                    📄 Page ${item.page_reference} ${item.section_context ? '• ' + item.section_context : ''}
+                                </div>
+                                <div style="margin: 4px 0; font-style: italic;">
+                                    "${item.quote}"
+                                </div>
+                                <div style="font-size: 0.75em; color: #6c757d;">
+                                    Relevance: ${Math.round(item.relevance_score * 100)}%
+                                </div>
+                            `;
+                            evidenceDiv.appendChild(evidenceItem);
+                        });
+                    } else {
+                        evidenceDiv.textContent = 'No relevant evidence found';
+                        evidenceDiv.style.fontStyle = 'italic';
+                        evidenceDiv.style.color = '#6c757d';
+                    }
+                    
+                    subEvidenceCell.appendChild(evidenceDiv);
+                    
+                    // Sub-requirement compliance status
+                    const subStatusCell = subRow.insertCell(4);
+                    const subStatusSpan = document.createElement('span');
+                    subStatusSpan.textContent = subreq.compliance_status;
+                    
+                    if (subreq.compliance_status === 'Fully Meets') {
+                        subStatusSpan.className = 'status-fully-meets';
+                    } else if (subreq.compliance_status === 'Partially Meets') {
+                        subStatusSpan.className = 'status-partially-meets';
+                    } else {
+                        subStatusSpan.className = 'status-does-not-meet';
+                    }
+                    
+                    subStatusCell.appendChild(subStatusSpan);
+                    
+                    // Sub-requirement confidence
+                    const subConfidenceCell = subRow.insertCell(5);
+                    const subConfidencePercent = Math.round(subreq.confidence_score * 100);
+                    subConfidenceCell.textContent = `${subConfidencePercent}%`;
+                    
+                    if (subConfidencePercent >= 80) {
+                        subConfidenceCell.style.color = '#28a745';
+                    } else if (subConfidencePercent >= 60) {
+                        subConfidenceCell.style.color = '#ffc107';
+                    } else {
+                        subConfidenceCell.style.color = '#dc3545';
+                    }
+                });
             });
             
             document.getElementById('results').style.display = 'block';
+        }
+        
+        function toggleSubrequirements(index) {
+            const icon = document.getElementById(`icon-${index}`);
+            const subreqRows = document.querySelectorAll(`.subreq-${index}`);
+            
+            subreqRows.forEach(row => {
+                if (row.style.display === 'none') {
+                    row.style.display = 'table-row';
+                    icon.textContent = '▼';
+                    icon.classList.add('expanded');
+                } else {
+                    row.style.display = 'none';
+                    icon.textContent = '▶';
+                    icon.classList.remove('expanded');
+                }
+            });
         }
         
         function showError(message) {

@@ -4,7 +4,7 @@ An AI-powered compliance analysis tool that leverages Azure AI services for auto
 
 ## Overview
 
-This project demonstrates the integration of Azure Document Intelligence and Language Services to create an intelligent compliance monitoring system. The application processes documents and performs automated compliance checks against regulatory frameworks.
+This project demonstrates the integration of Azure OpenAI Services to create an intelligent compliance monitoring system. The application processes documents and performs automated compliance checks against regulatory frameworks.
 
 ## Features
 
@@ -14,11 +14,15 @@ This project demonstrates the integration of Azure Document Intelligence and Lan
 - RESTful API integration
 - Real-time processing capabilities
 
+- new features on Aug 9 - 
+- Sub-requirement parsing and individual assessment
+- Expandable compliance breakdown
+- Page-specific evidence citations with confidence scoring
+
 ## Technologies Used
 
 - **Python 3.x** - Core development language
-- **Azure Document Intelligence** - Document processing
-- **Azure Language Services** - Text analysis
+- **Azure OpenAI** - Document processing
 - **Flask/FastAPI** - Web framework (update based on what you're using)
 - **Pandas** - Data manipulation
 - **JSON** - Data exchange format
