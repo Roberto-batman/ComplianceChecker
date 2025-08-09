@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIST Access Control Compliance Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .file-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            background: white;
+        }
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+        }
+        .results-table th {
+            background: #34495e;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #2c3e50;
+        }
+        .results-table td {
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            vertical-align: top;
+        }
+        .results-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .status-fully-meets {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-partially-meets {
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-does-not-meet {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .evidence-text {
+            max-width: 300px;
+            max-height: 100px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 NIST Access Control Compliance Checker</h1>
+        
+        <div class="upload-section">
+            <h3>Upload Policy Document (PDF)</h3>
+            <p>Upload your organization's access control policy document to check compliance against NIST AC controls.</p>
+            <input type="file" id="fileInput" class="file-input" accept=".pdf" />
+            <br>
+            <button id="checkCompliance" class="btn" onclick="checkCompliance()">
+                Check Compliance
+            </button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            🔄 Analyzing document with AI... This may take a moment.
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="results" style="display: none;">
+            <h3>📊 Compliance Assessment Results</h3>
+            <table id="resultsTable" class="results-table">
+                <thead>
+                    <tr>
+                        <th>Control ID</th>
+                        <th>Title</th>
+                        <th>Evidence Found</th>
+                        <th>Compliance Status</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function checkCompliance() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Please select a PDF file to upload.');
+                return;
+            }
+            
+            if (file.type !== 'application/pdf') {
+                showError('Please select a PDF file.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('document', file);
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('checkCompliance').disabled = true;
+            
+            try {
+                // Update this URL to match your Azure Function URL when deployed
+                const response = await fetch('http://localhost:7071/api/ComplianceChecker', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to process document');
+                }
+                
+                displayResults(data.results);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error processing document: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('checkCompliance').disabled = false;
+            }
+        }
+        
+        function displayResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            
+            results.forEach(result => {
+                const row = tbody.insertRow();
+                
+                // Control ID
+                const cellId = row.insertCell(0);
+                cellId.textContent = result.control_id;
+                cellId.style.fontWeight = 'bold';
+                
+                // Title
+                const cellTitle = row.insertCell(1);
+                cellTitle.textContent = result.title;
+                
+                // Evidence Found
+                const cellEvidence = row.insertCell(2);
+                const evidenceDiv = document.createElement('div');
+                evidenceDiv.className = 'evidence-text';
+                evidenceDiv.textContent = result.evidence_found;
+                cellEvidence.appendChild(evidenceDiv);
+                
+                // Compliance Status
+                const cellStatus = row.insertCell(3);
+                const statusSpan = document.createElement('span');
+                statusSpan.textContent = result.compliance_status;
+                
+                if (result.compliance_status === 'Fully Meets') {
+                    statusSpan.className = 'status-fully-meets';
+                } else if (result.compliance_status === 'Partially Meets') {
+                    statusSpan.className = 'status-partially-meets';
+                } else {
+                    statusSpan.className = 'status-does-not-meet';
+                }
+                
+                cellStatus.appendChild(statusSpan);
+            });
+            
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
