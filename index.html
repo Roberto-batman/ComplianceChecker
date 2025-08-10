@@ -210,7 +210,7 @@
             
             try {
                 // Update this URL to match your Azure Function URL when deployed
-                const response = await fetch('http://localhost:7071/api/ComplianceChecker', {
+                const response = await fetch('/api/ComplianceChecker', {
                     method: 'POST',
                     body: formData
                 });
