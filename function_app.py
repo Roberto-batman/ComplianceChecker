@@ -263,6 +263,25 @@ Instructions:
 def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('NIST Compliance Checker triggered')
     
+
+
+    # Debug environment variables
+    import os
+    logging.info(f"AZURE_OPENAI_ENDPOINT: {os.environ.get('AZURE_OPENAI_ENDPOINT', 'NOT_FOUND')}")
+    logging.info(f"AZURE_OPENAI_DEPLOYMENT: {os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'NOT_FOUND')}")
+    logging.info(f"AZURE_OPENAI_API_VERSION: {os.environ.get('AZURE_OPENAI_API_VERSION', 'NOT_FOUND')}")
+    logging.info(f"AZURE_OPENAI_KEY exists: {'YES' if os.environ.get('AZURE_OPENAI_KEY') else 'NO'}")
+
+
+
+
+
+
+
+
+
+
+
     # Handle CORS preflight request
     if req.method == 'OPTIONS':
         return func.HttpResponse(
