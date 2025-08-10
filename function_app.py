@@ -384,9 +384,19 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
         )
         
     except Exception as e:
-        logging.error(f"Error in ComplianceChecker: {e}")
+        import os
+        debug_info = {
+            "error": f"Error processing document: {str(e)}",
+            "debug": {
+                "endpoint": os.environ.get('AZURE_OPENAI_ENDPOINT', 'NOT_FOUND'),
+                "deployment": os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'NOT_FOUND'),
+                "api_version": os.environ.get('AZURE_OPENAI_API_VERSION', 'NOT_FOUND'),
+                "key_exists": 'YES' if os.environ.get('AZURE_OPENAI_KEY') else 'NO'
+            }
+        }
+        logging.error(f"Compliance check failed: {str(e)}")
         return func.HttpResponse(
-            json.dumps({"error": f"Internal server error: {str(e)}"}),
+            json.dumps(debug_info),
             status_code=500,
             mimetype="application/json",
             headers={
