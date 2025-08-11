@@ -4,6 +4,7 @@ import json
 import os
 from PyPDF2 import PdfReader
 import io
+from openai import AzureOpenAI
 
 app = func.FunctionApp()
 
@@ -38,19 +39,41 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             page_text = page.extract_text()
             text_content += f"\n--- Page {page_num + 1} ---\n{page_text}"
         
-        # Return debug info about the PDF processing
+        # Test Azure OpenAI connection
+        client = AzureOpenAI(
+            api_version=os.environ.get('AZURE_OPENAI_API_VERSION'),
+            azure_endpoint=os.environ.get('AZURE_OPENAI_ENDPOINT'),
+            api_key=os.environ.get('AZURE_OPENAI_KEY')
+        )
+        
+        # Simple test call
+        test_response = client.chat.completions.create(
+            model=os.environ.get('AZURE_OPENAI_DEPLOYMENT'),
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Say 'Hello, Azure OpenAI is working!' in JSON format with a 'message' field."}
+            ],
+            max_tokens=100,
+            temperature=0
+        )
+        
+        ai_response = test_response.choices[0].message.content
+        
+        # Return debug info including AI test
         debug_info = {
-            "message": "PDF processed successfully!",
+            "message": "PDF and AI both working!",
             "pdf_info": {
                 "filename": pdf_file.filename,
-                "size_bytes": len(pdf_content),
                 "page_count": page_count,
-                "text_length": len(text_content),
-                "first_100_chars": text_content[:100] + "..." if len(text_content) > 100 else text_content
+                "text_length": len(text_content)
+            },
+            "ai_test": {
+                "status": "success",
+                "response": ai_response
             },
             "environment_check": {
-                "endpoint": os.environ.get('AZURE_OPENAI_ENDPOINT', 'NOT_FOUND'),
-                "deployment": os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'NOT_FOUND'),
+                "endpoint": os.environ.get('AZURE_OPENAI_ENDPOINT'),
+                "deployment": os.environ.get('AZURE_OPENAI_DEPLOYMENT'),
                 "key_exists": 'YES' if os.environ.get('AZURE_OPENAI_KEY') else 'NO'
             }
         }
@@ -70,7 +93,7 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
         error_info = {
             "error": f"Error processing document: {str(e)}",
             "error_type": type(e).__name__,
-            "debug": "PDF processing failed"
+            "debug": "AI connection test failed"
         }
         logging.error(f"Compliance check failed: {str(e)}")
         return func.HttpResponse(
