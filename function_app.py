@@ -1,8 +1,13 @@
+import azure.functions as func
+import logging
+import json
+import os
+
+app = func.FunctionApp()
+
 @app.route(route="ComplianceChecker", auth_level=func.AuthLevel.ANONYMOUS)
 def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('NIST Compliance Checker triggered')
-    
-    import os
     
     # Simple test response with environment variable check
     debug_info = {
@@ -11,7 +16,11 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             "endpoint": os.environ.get('AZURE_OPENAI_ENDPOINT', 'NOT_FOUND'),
             "deployment": os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'NOT_FOUND'),
             "api_version": os.environ.get('AZURE_OPENAI_API_VERSION', 'NOT_FOUND'),
-            "key_exists": 'YES' if os.environ.get('AZURE_OPENAI_KEY') else 'NO'
+            "key_exists": 'YES' if os.environ.get('AZURE_OPENAI_KEY') else 'NO',
+            # Also check alternative environment variable names
+            "alt_endpoint": os.environ.get('AZURE_ENDPOINT', 'NOT_FOUND'),
+            "alt_key_exists": 'YES' if os.environ.get('AZURE_API_KEY') else 'NO',
+            "subscription_key_exists": 'YES' if os.environ.get('subscription_key') else 'NO'
         }
     }
     
