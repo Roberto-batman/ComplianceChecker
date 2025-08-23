@@ -12,27 +12,6 @@ app = func.FunctionApp()
 # Add this import at the top of your function_app.py
 from datetime import datetime
 
-# Then replace your AI prompt section (around line 60) with this:
-current_date = datetime.now().strftime('%B %d, %Y')
-
-prompt = f"""
-Today's date is {current_date}. 
-
-Analyze the following policy document for compliance with NIST control {control_id}: {control_info['title']}.
-
-Control definition: {control_info['definition']}
-
-Document text: {text_content[:8000]}  
-
-Important: For time-based requirements (like "every 3 years" or "annually"), consider today's date when evaluating compliance. For example, if a policy was reviewed in 2023 and it's now 2025, that's within a 3-year requirement.
-
-Provide a JSON response with:
-- "evidence": quoted text from the document that supports this control (or "No evidence found")
-- "status": either "Fully Meets", "Partially Meets", or "Does Not Meet"
-- "confidence": a number between 0 and 1
-
-Response must be valid JSON only.
-"""
 
 
 # Enhanced NIST controls with sub-requirements
@@ -115,24 +94,28 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
         
         results = []
         
-        # Process each control
-        for control_id, control_info in NIST_CONTROLS.items():
-            
-            # Create prompt for AI
-            prompt = f"""
-            Analyze the following policy document for compliance with NIST control {control_id}: {control_info['title']}.
-            
-            Control definition: {control_info['definition']}
-            
-            Document text: {text_content[:8000]}  
-            
-            Provide a JSON response with:
-            - "evidence": quoted text from the document that supports this control (or "No evidence found")
-            - "status": either "Fully Meets", "Partially Meets", or "Does Not Meet"
-            - "confidence": a number between 0 and 1
-            
-            Response must be valid JSON only.
-            """
+
+        # Then replace your AI prompt section (around line 60) with this:
+        current_date = datetime.now().strftime('%B %d, %Y')
+
+        prompt = f"""
+        Today's date is {current_date}. 
+
+        Analyze the following policy document for compliance with NIST control {control_id}: {control_info['title']}.
+
+        Control definition: {control_info['definition']}
+
+        Document text: {text_content[:8000]}  
+
+        Important: For time-based requirements (like "every 3 years" or "annually"), consider today's date when evaluating compliance. For example, if a policy was reviewed in 2023 and it's now 2025, that's within a 3-year requirement.
+
+        Provide a JSON response with:
+        - "evidence": quoted text from the document that supports this control (or "No evidence found")
+        - "status": either "Fully Meets", "Partially Meets", or "Does Not Meet"
+        - "confidence": a number between 0 and 1
+
+        Response must be valid JSON only.
+        """ 
             
             # Call Azure OpenAI
             ai_response = client.chat.completions.create(
