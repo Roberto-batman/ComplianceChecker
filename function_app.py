@@ -356,7 +356,13 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                 control_result["overall_confidence"] = calculate_overall_confidence(sub_results)
                 
                 # Combine evidence from successful sub-requirements
-                evidence_pieces = [r['evidence'] for r in sub_results if r['evidence'] != 'No evidence found' and r['status'] != 'Error']
+                evidence_pieces = []
+                for r in sub_results:
+                    if r['evidence'] != 'No evidence found' and r['status'] != 'Error':
+                        # Ensure evidence is a string
+                        evidence = str(r['evidence']) if r['evidence'] else 'No evidence found'
+                        evidence_pieces.append(evidence)
+                
                 if evidence_pieces:
                     control_result["overall_evidence"] = " | ".join(evidence_pieces[:2])  # Top 2 pieces
                 
