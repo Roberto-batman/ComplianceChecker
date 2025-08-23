@@ -3,4 +3,3 @@ azure-functions
 openai
 PyPDF2
 python-dotenv
-azure-functions-worker
