@@ -5,14 +5,9 @@ import os
 from PyPDF2 import PdfReader
 import io
 from openai import AzureOpenAI
-
-app = func.FunctionApp()
-
-
-# Add this import at the top of your function_app.py
 from datetime import datetime
 
-
+app = func.FunctionApp()
 
 # Enhanced NIST controls with sub-requirements
 NIST_CONTROLS = {
@@ -55,6 +50,7 @@ NIST_CONTROLS = {
         }
     }
 }
+
 @app.route(route="ComplianceChecker", auth_level=func.AuthLevel.ANONYMOUS)
 def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('NIST Compliance Checker triggered')
@@ -85,6 +81,8 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             page_text = page.extract_text()
             text_content += f"\n--- Page {page_num + 1} ---\n{page_text}"
         
+        logging.info(f"Extracted {len(text_content)} characters from PDF")
+        
         # Initialize Azure OpenAI client
         client = AzureOpenAI(
             api_version=os.environ.get('AZURE_OPENAI_API_VERSION'),
@@ -93,68 +91,83 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
         )
         
         results = []
-        
-
-        # Then replace your AI prompt section (around line 60) with this:
         current_date = datetime.now().strftime('%B %d, %Y')
-
-        prompt = f"""
-        Today's date is {current_date}. 
-
-        Analyze the following policy document for compliance with NIST control {control_id}: {control_info['title']}.
-
-        Control definition: {control_info['definition']}
-
-        Document text: {text_content[:8000]}  
-
-        Important: For time-based requirements (like "every 3 years" or "annually"), consider today's date when evaluating compliance. For example, if a policy was reviewed in 2023 and it's now 2025, that's within a 3-year requirement.
-
-        Provide a JSON response with:
-        - "evidence": quoted text from the document that supports this control (or "No evidence found")
-        - "status": either "Fully Meets", "Partially Meets", or "Does Not Meet"
-        - "confidence": a number between 0 and 1
-
-        Response must be valid JSON only.
-        """ 
-            
-            # Call Azure OpenAI
-            ai_response = client.chat.completions.create(
-                model=os.environ.get('AZURE_OPENAI_DEPLOYMENT'),
-                messages=[
-                    {"role": "system", "content": "You are a NIST compliance expert. Respond only with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.1
-            )
-            
-            response_text = ai_response.choices[0].message.content.strip()
-            
-            # Clean up the response (remove markdown if present)
-            if response_text.startswith('```json'):
-                response_text = response_text.replace('```json', '').replace('```', '').strip()
+        
+        # Process each NIST control
+        for control_id, control_info in NIST_CONTROLS.items():
+            logging.info(f"Analyzing control {control_id}")
             
             try:
-                ai_result = json.loads(response_text)
+                prompt = f"""
+                Today's date is {current_date}. 
+
+                Analyze the following policy document for compliance with NIST control {control_id}: {control_info['title']}.
+
+                Control definition: {control_info['definition']}
+
+                Document text: {text_content[:8000]}  
+
+                Important: For time-based requirements (like "every 3 years" or "annually"), consider today's date when evaluating compliance. For example, if a policy was reviewed in 2023 and it's now 2025, that's within a 3-year requirement.
+
+                Provide a JSON response with:
+                - "evidence": quoted text from the document that supports this control (or "No evidence found")
+                - "status": either "Fully Meets", "Partially Meets", or "Does Not Meet"
+                - "confidence": a number between 0 and 1
+
+                Response must be valid JSON only.
+                """
                 
-                result = {
+                # Call Azure OpenAI
+                ai_response = client.chat.completions.create(
+                    model=os.environ.get('AZURE_OPENAI_DEPLOYMENT'),
+                    messages=[
+                        {"role": "system", "content": "You are a NIST compliance expert. Respond only with valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1000,
+                    temperature=0.1
+                )
+                
+                response_text = ai_response.choices[0].message.content.strip()
+                logging.info(f"Raw AI response for {control_id}: {response_text[:200]}...")
+                
+                # Clean up the response (remove markdown if present)
+                if response_text.startswith('```json'):
+                    response_text = response_text.replace('```json', '').replace('```', '').strip()
+                
+                try:
+                    ai_result = json.loads(response_text)
+                    
+                    result = {
+                        "control_id": control_id,
+                        "title": control_info['title'],
+                        "evidence": ai_result.get('evidence', 'No evidence found'),
+                        "status": ai_result.get('status', 'Does Not Meet'),
+                        "confidence": ai_result.get('confidence', 0.0)
+                    }
+                    
+                except json.JSONDecodeError as json_err:
+                    logging.error(f"JSON parse error for {control_id}: {str(json_err)}")
+                    logging.error(f"Response text: {response_text}")
+                    result = {
+                        "control_id": control_id,
+                        "title": control_info['title'],
+                        "evidence": "AI response parsing error",
+                        "status": "Error",
+                        "confidence": 0.0
+                    }
+                
+                results.append(result)
+                
+            except Exception as control_error:
+                logging.error(f"Error processing control {control_id}: {str(control_error)}")
+                results.append({
                     "control_id": control_id,
                     "title": control_info['title'],
-                    "evidence": ai_result.get('evidence', 'No evidence found'),
-                    "status": ai_result.get('status', 'Does Not Meet'),
-                    "confidence": ai_result.get('confidence', 0.0)
-                }
-                
-            except json.JSONDecodeError:
-                result = {
-                    "control_id": control_id,
-                    "title": control_info['title'],
-                    "evidence": "AI response parsing error",
-                    "status": "Error",
+                    "evidence": f"Processing error: {str(control_error)}",
+                    "status": "Error", 
                     "confidence": 0.0
-                }
-            
-            results.append(result)
+                })
         
         return func.HttpResponse(
             json.dumps({"results": results}),
