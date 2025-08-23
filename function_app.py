@@ -78,6 +78,23 @@ NIST_CONTROLS = {
                     "accountability": "Evidence of who is responsible for account oversight"
                 }
             },
+            "AC-2(C)": {
+                "title": "Group and role membership conditions",
+                "definition": "The organization establishes conditions for group and role membership.",
+                "assessment_criteria": {
+                    "membership_criteria": "Look for rules about who can belong to groups or roles",
+                    "access_conditions": "Evidence of requirements for group/role assignment"
+                }
+            },
+            "AC-2(D)": {
+                "title": "Account specifications",
+                "definition": "The organization specifies authorized users of the information system, group and role membership, and access authorizations (i.e., privileges) and other attributes (as required) for each account.",
+                "assessment_criteria": {
+                    "user_specification": "Look for identification of authorized users",
+                    "privilege_definition": "Evidence of defined access levels and permissions",
+                    "attribute_management": "Documentation of account attributes and characteristics"
+                }
+            },
             "AC-2(E)": {
                 "title": "Account creation approval",
                 "definition": "The organization requires approvals by responsible managers for requests to create information system accounts.",
@@ -94,12 +111,76 @@ NIST_CONTROLS = {
                     "systematic_approach": "Evidence of organized processes for managing account changes"
                 }
             },
+            "AC-2(G)": {
+                "title": "Account monitoring",
+                "definition": "The organization monitors the use of information system accounts.",
+                "assessment_criteria": {
+                    "monitoring_processes": "Look for evidence of account usage monitoring",
+                    "oversight_mechanisms": "Procedures for tracking account activity"
+                }
+            },
+            "AC-2(H)(a)": {
+                "title": "Notification - accounts no longer required",
+                "definition": "The organization notifies account managers when accounts are no longer required.",
+                "assessment_criteria": {
+                    "notification_process": "Look for procedures to notify managers about unneeded accounts",
+                    "account_cleanup": "Evidence of processes to identify and remove unused accounts"
+                }
+            },
+            "AC-2(H)(b)": {
+                "title": "Notification - user termination/transfer",
+                "definition": "The organization notifies account managers when users are terminated or transferred.",
+                "assessment_criteria": {
+                    "termination_notification": "Look for procedures to notify when users leave",
+                    "transfer_notification": "Evidence of notification when users change roles"
+                }
+            },
+            "AC-2(H)(c)": {
+                "title": "Notification - usage/need-to-know changes",
+                "definition": "The organization notifies account managers when individual information system usage or need-to-know changes.",
+                "assessment_criteria": {
+                    "usage_change_notification": "Look for procedures to notify about changing access needs",
+                    "need_to_know_updates": "Evidence of communication about access requirement changes"
+                }
+            },
+            "AC-2(I)(a)": {
+                "title": "Authorization - valid access",
+                "definition": "The organization authorizes access to the information system based on a valid access authorization.",
+                "assessment_criteria": {
+                    "authorization_requirement": "Look for requirement of valid authorization before access",
+                    "approval_documentation": "Evidence of formal authorization processes"
+                }
+            },
+            "AC-2(I)(b)": {
+                "title": "Authorization - intended usage",
+                "definition": "The organization authorizes access to the information system based on intended system usage.",
+                "assessment_criteria": {
+                    "usage_based_access": "Look for access tied to intended use of systems",
+                    "purpose_alignment": "Evidence that access matches job requirements"
+                }
+            },
+            "AC-2(I)(c)": {
+                "title": "Authorization - other attributes",
+                "definition": "The organization authorizes access to the information system based on other attributes as required by the organization or associated missions/business functions.",
+                "assessment_criteria": {
+                    "attribute_based_access": "Look for access based on other organizational attributes",
+                    "business_function_alignment": "Evidence of access tied to business needs"
+                }
+            },
             "AC-2(J)": {
                 "title": "Annual account review",
                 "definition": "The organization reviews accounts for compliance with account management requirements at least annually.",
                 "assessment_criteria": {
                     "regular_review": "Look for evidence of periodic account reviews",
                     "annual_frequency": "Reviews happening at least once per year"
+                }
+            },
+            "AC-2(K)": {
+                "title": "Shared account credential reissuance",
+                "definition": "The organization establishes a process for reissuing shared/group account credentials (if deployed) when individuals are removed from the group.",
+                "assessment_criteria": {
+                    "credential_reissuance": "Look for procedures to change shared credentials when users leave",
+                    "shared_account_management": "Evidence of processes for managing group accounts"
                 }
             }
         }
@@ -113,10 +194,12 @@ NIST_CONTROLS = {
                 "title": "Logical access enforcement",
                 "definition": "The information system enforces approved authorizations for logical access to information and system resources in accordance with applicable access control policies.",
                 "assessment_criteria": {
-                    "enforcement_mechanisms": "Look for technical controls that prevent unauthorized access",
-                    "authorization_requirement": "Evidence that access is granted only after proper authorization",
-                    "policy_compliance": "Access controls that align with stated policies"
-                }
+                    "technical_enforcement": "Look for evidence of automated/technical controls that prevent unauthorized access",
+                    "system_implementation": "Evidence of actual system configurations, not just policy statements",
+                    "authorization_verification": "Proof that systems check authorizations before granting access",
+                    "policy_alignment": "Evidence that technical controls match stated policies"
+                },
+                "assessment_guidance": "This requirement focuses on SYSTEM enforcement, not just policy existence. Policy documents alone can only achieve 'Partially Meets' unless they include evidence of technical implementation such as: system configurations, access logs, technical controls, automated enforcement mechanisms, or proof of system testing."
             }
         }
     }
@@ -151,6 +234,14 @@ SPECIFIC CRITERIA TO CHECK for {sub_id}:
 """
         for criterion, description in criteria.items():
             base_prompt += f"• {criterion.upper()}: {description}\n"
+        
+        # Add special assessment guidance if available
+        if 'assessment_guidance' in sub_info:
+            base_prompt += f"""
+SPECIAL ASSESSMENT GUIDANCE for {sub_id}:
+{sub_info['assessment_guidance']}
+
+"""
         
         base_prompt += """
 ASSESSMENT LOGIC:
