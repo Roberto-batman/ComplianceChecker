@@ -7,7 +7,7 @@
 <style>
 body {
 font-family: Arial, sans-serif;
-max-width: 1200px;
+max-width: 1400px;
 margin: 0 auto;
 padding: 20px;
 background-color: #f5f5f5;
@@ -59,47 +59,133 @@ text-align: center;
 color: #7f8c8d;
 font-style: italic;
 }
-.results-table {
-width: 100%;
-border-collapse: collapse;
-margin-top: 20px;
-background: white;
+.control-section {
+margin: 20px 0;
+border: 1px solid #ddd;
+border-radius: 8px;
+overflow: hidden;
 }
-.results-table th {
+.control-header {
 background: #34495e;
 color: white;
-padding: 12px;
-text-align: left;
-border: 1px solid #2c3e50;
+padding: 15px;
+cursor: pointer;
+display: flex;
+justify-content: space-between;
+align-items: center;
 }
-.results-table td {
-padding: 12px;
-border: 1px solid #bdc3c7;
-vertical-align: top;
+.control-header:hover {
+background: #2c3e50;
 }
-.results-table tr:nth-child(even) {
-background: #f8f9fa;
+.control-title {
+font-size: 18px;
+font-weight: bold;
+}
+.control-status {
+display: flex;
+align-items: center;
+gap: 15px;
+}
+.status-badge {
+padding: 4px 12px;
+border-radius: 4px;
+font-weight: bold;
+font-size: 14px;
 }
 .status-fully-meets {
 background: #d4edda;
 color: #155724;
-padding: 4px 8px;
-border-radius: 4px;
-font-weight: bold;
 }
 .status-partially-meets {
 background: #fff3cd;
 color: #856404;
-padding: 4px 8px;
-border-radius: 4px;
-font-weight: bold;
 }
 .status-does-not-meet {
 background: #f8d7da;
 color: #721c24;
-padding: 4px 8px;
-border-radius: 4px;
+}
+.status-error {
+background: #f8d7da;
+color: #721c24;
+}
+.confidence {
+font-size: 14px;
+color: #ecf0f1;
+}
+.control-details {
+display: none;
+background: white;
+}
+.control-details.expanded {
+display: block;
+}
+.control-definition {
+padding: 20px;
+background: #f8f9fa;
+border-bottom: 1px solid #ddd;
+}
+.definition-text {
+line-height: 1.6;
+color: #495057;
+}
+.sub-requirements {
+padding: 0;
+}
+.sub-requirement {
+border-bottom: 1px solid #e9ecef;
+padding: 15px 20px;
+}
+.sub-requirement:last-child {
+border-bottom: none;
+}
+.sub-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 10px;
+}
+.sub-id {
 font-weight: bold;
+color: #2c3e50;
+}
+.sub-title {
+color: #495057;
+font-size: 14px;
+}
+.sub-evidence {
+background: #f8f9fa;
+padding: 10px;
+border-radius: 4px;
+border-left: 3px solid #3498db;
+margin: 10px 0;
+font-size: 13px;
+line-height: 1.4;
+max-height: 100px;
+overflow-y: auto;
+}
+.overall-evidence {
+padding: 20px;
+background: #f8f9fa;
+border-top: 1px solid #ddd;
+}
+.evidence-title {
+font-weight: bold;
+margin-bottom: 10px;
+color: #2c3e50;
+}
+.evidence-text {
+line-height: 1.4;
+color: #495057;
+background: white;
+padding: 10px;
+border-radius: 4px;
+border-left: 3px solid #3498db;
+}
+.expand-icon {
+transition: transform 0.3s ease;
+}
+.expand-icon.expanded {
+transform: rotate(180deg);
 }
 .error {
 background: #f8d7da;
@@ -108,12 +194,39 @@ padding: 15px;
 border-radius: 5px;
 margin: 10px 0;
 }
-.evidence-text {
-max-width: 400px;
-max-height: 120px;
-overflow-y: auto;
-font-size: 0.9em;
-line-height: 1.4;
+.summary-stats {
+display: flex;
+justify-content: space-around;
+background: #f8f9fa;
+padding: 20px;
+border-radius: 8px;
+margin: 20px 0;
+}
+.stat-item {
+text-align: center;
+}
+.stat-number {
+font-size: 24px;
+font-weight: bold;
+color: #2c3e50;
+}
+.stat-label {
+font-size: 12px;
+color: #7f8c8d;
+text-transform: uppercase;
+}
+.toggle-all {
+background: #95a5a6;
+color: white;
+padding: 8px 16px;
+border: none;
+border-radius: 4px;
+cursor: pointer;
+font-size: 14px;
+margin-bottom: 20px;
+}
+.toggle-all:hover {
+background: #7f8c8d;
 }
 </style>
 </head>
@@ -123,7 +236,7 @@ line-height: 1.4;
 
 <div class="upload-section">
 <h3>Upload Policy Document (PDF)</h3>
-<p>Upload your organization's access control policy document to check compliance against NIST AC controls.</p>
+<p>Upload your organization's access control policy document to check compliance against NIST AC controls and sub-requirements.</p>
 <input type="file" id="fileInput" class="file-input" accept=".pdf" />
 <br>
 <button id="checkCompliance" class="btn" onclick="checkCompliance()">
@@ -132,7 +245,7 @@ Check Compliance
 </div>
 
 <div id="loading" class="loading" style="display: none;">
-🤖 Analyzing document with AI... This may take a moment.
+🤖 Analyzing document with AI... This may take a moment as we check each sub-requirement.
 </div>
 
 <div id="error" class="error" style="display: none;"></div>
@@ -142,23 +255,18 @@ Check Compliance
 <div id="documentInfo" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
 <strong>Document:</strong> <span id="documentTitle"></span>
 </div>
-<table id="resultsTable" class="results-table">
-<thead>
-<tr>
-<th>Control ID</th>
-<th>Title</th>
-<th>Evidence Found</th>
-<th>Compliance Status</th>
-<th>Confidence</th>
-</tr>
-</thead>
-<tbody id="resultsBody">
-</tbody>
-</table>
+
+<div id="summaryStats" class="summary-stats"></div>
+
+<button id="toggleAll" class="toggle-all" onclick="toggleAllControls()">Expand All Controls</button>
+
+<div id="controlsList"></div>
 </div>
 </div>
 
 <script>
+let allExpanded = false;
+
 async function checkCompliance() {
 const fileInput = document.getElementById('fileInput');
 const file = fileInput.files[0];
@@ -206,64 +314,194 @@ document.getElementById('checkCompliance').disabled = false;
 }
 
 function displayResults(results) {
-const tbody = document.getElementById('resultsBody');
-tbody.innerHTML = '';
-
 // Display document title
 document.getElementById('documentTitle').textContent = 'Uploaded Policy Document';
 
+// Calculate summary statistics
+const stats = calculateStats(results);
+displaySummaryStats(stats);
+
+// Display control results
+const controlsList = document.getElementById('controlsList');
+controlsList.innerHTML = '';
+
 results.forEach((result, index) => {
-// Main control row
-const mainRow = tbody.insertRow();
-mainRow.className = 'control-row';
-
-// Control ID
-const cellId = mainRow.insertCell(0);
-cellId.textContent = result.control_id;
-cellId.style.fontWeight = 'bold';
-
-// Title
-const cellTitle = mainRow.insertCell(1);
-cellTitle.textContent = result.title;
-
-// Evidence
-const cellEvidence = mainRow.insertCell(2);
-const evidenceDiv = document.createElement('div');
-evidenceDiv.className = 'evidence-text';
-evidenceDiv.textContent = result.evidence;
-cellEvidence.appendChild(evidenceDiv);
-
-// Compliance Status
-const cellStatus = mainRow.insertCell(3);
-const statusSpan = document.createElement('span');
-statusSpan.textContent = result.status;
-
-if (result.status === 'Fully Meets') {
-statusSpan.className = 'status-fully-meets';
-} else if (result.status === 'Partially Meets') {
-statusSpan.className = 'status-partially-meets';
-} else {
-statusSpan.className = 'status-does-not-meet';
-}
-
-cellStatus.appendChild(statusSpan);
-
-// Confidence
-const cellConfidence = mainRow.insertCell(4);
-const confidencePercent = Math.round(result.confidence * 100);
-cellConfidence.textContent = `${confidencePercent}%`;
-cellConfidence.style.fontWeight = 'bold';
-
-if (confidencePercent >= 80) {
-cellConfidence.style.color = '#28a745';
-} else if (confidencePercent >= 60) {
-cellConfidence.style.color = '#ffc107';
-} else {
-cellConfidence.style.color = '#dc3545';
-}
+const controlDiv = createControlElement(result, index);
+controlsList.appendChild(controlDiv);
 });
 
 document.getElementById('results').style.display = 'block';
+}
+
+function calculateStats(results) {
+let totalSubRequirements = 0;
+let fullyMeets = 0;
+let partiallyMeets = 0;
+let doesNotMeet = 0;
+let errors = 0;
+
+results.forEach(control => {
+// Count overall control status
+switch(control.overall_status) {
+case 'Fully Meets': fullyMeets++; break;
+case 'Partially Meets': partiallyMeets++; break;
+case 'Does Not Meet': doesNotMeet++; break;
+case 'Error': errors++; break;
+}
+
+// Count sub-requirements
+totalSubRequirements += control.sub_requirements.length;
+});
+
+return {
+totalControls: results.length,
+totalSubRequirements,
+fullyMeets,
+partiallyMeets,
+doesNotMeet,
+errors
+};
+}
+
+function displaySummaryStats(stats) {
+const summaryDiv = document.getElementById('summaryStats');
+summaryDiv.innerHTML = `
+<div class="stat-item">
+<div class="stat-number">${stats.totalControls}</div>
+<div class="stat-label">Controls</div>
+</div>
+<div class="stat-item">
+<div class="stat-number">${stats.totalSubRequirements}</div>
+<div class="stat-label">Sub-Requirements</div>
+</div>
+<div class="stat-item">
+<div class="stat-number">${stats.fullyMeets}</div>
+<div class="stat-label">Fully Meets</div>
+</div>
+<div class="stat-item">
+<div class="stat-number">${stats.partiallyMeets}</div>
+<div class="stat-label">Partially Meets</div>
+</div>
+<div class="stat-item">
+<div class="stat-number">${stats.doesNotMeet}</div>
+<div class="stat-label">Does Not Meet</div>
+</div>
+`;
+}
+
+function createControlElement(control, index) {
+const controlDiv = document.createElement('div');
+controlDiv.className = 'control-section';
+
+const statusClass = getStatusClass(control.overall_status);
+const confidencePercent = Math.round(control.overall_confidence * 100);
+
+controlDiv.innerHTML = `
+<div class="control-header" onclick="toggleControl(${index})">
+<div class="control-title">${control.control_id}: ${control.title}</div>
+<div class="control-status">
+<span class="confidence">${confidencePercent}%</span>
+<span class="status-badge ${statusClass}">${control.overall_status}</span>
+<span class="expand-icon" id="icon-${index}">▼</span>
+</div>
+</div>
+<div class="control-details" id="details-${index}">
+<div class="control-definition">
+<div class="evidence-title">Control Definition</div>
+<div class="definition-text">${formatDefinition(control.definition)}</div>
+</div>
+${control.sub_requirements.length > 0 ? createSubRequirementsHtml(control.sub_requirements) : ''}
+<div class="overall-evidence">
+<div class="evidence-title">Overall Evidence</div>
+<div class="evidence-text">${control.overall_evidence}</div>
+</div>
+</div>
+`;
+
+return controlDiv;
+}
+
+function createSubRequirementsHtml(subRequirements) {
+let html = '<div class="sub-requirements">';
+
+subRequirements.forEach(sub => {
+const statusClass = getStatusClass(sub.status);
+const confidencePercent = Math.round(sub.confidence * 100);
+
+html += `
+<div class="sub-requirement">
+<div class="sub-header">
+<div>
+<span class="sub-id">${sub.sub_id}</span>
+<div class="sub-title">${sub.title}</div>
+</div>
+<div class="control-status">
+<span class="confidence">${confidencePercent}%</span>
+<span class="status-badge ${statusClass}">${sub.status}</span>
+</div>
+</div>
+<div class="definition-text">${formatDefinition(sub.definition)}</div>
+<div class="sub-evidence">${sub.evidence}</div>
+</div>
+`;
+});
+
+html += '</div>';
+return html;
+}
+
+function getStatusClass(status) {
+switch(status) {
+case 'Fully Meets': return 'status-fully-meets';
+case 'Partially Meets': return 'status-partially-meets';
+case 'Does Not Meet': return 'status-does-not-meet';
+case 'Error': return 'status-error';
+default: return 'status-error';
+}
+}
+
+function formatDefinition(definition) {
+// Convert line breaks and format the definition text
+return definition.replace(/\n/g, '<br>').replace(/\r/g, '');
+}
+
+function toggleControl(index) {
+const details = document.getElementById(`details-${index}`);
+const icon = document.getElementById(`icon-${index}`);
+  
+if (details.classList.contains('expanded')) {
+details.classList.remove('expanded');
+icon.classList.remove('expanded');
+} else {
+details.classList.add('expanded');
+icon.classList.add('expanded');
+}
+}
+
+function toggleAllControls() {
+const allDetails = document.querySelectorAll('.control-details');
+const allIcons = document.querySelectorAll('.expand-icon');
+const toggleButton = document.getElementById('toggleAll');
+
+allExpanded = !allExpanded;
+
+allDetails.forEach(details => {
+if (allExpanded) {
+details.classList.add('expanded');
+} else {
+details.classList.remove('expanded');
+}
+});
+
+allIcons.forEach(icon => {
+if (allExpanded) {
+icon.classList.add('expanded');
+} else {
+icon.classList.remove('expanded');
+}
+});
+
+toggleButton.textContent = allExpanded ? 'Collapse All Controls' : 'Expand All Controls';
 }
 
 function showError(message) {
