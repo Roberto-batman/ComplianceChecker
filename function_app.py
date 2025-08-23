@@ -5,7 +5,7 @@ import os
 from PyPDF2 import PdfReader
 import io
 from openai import AzureOpenAI
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = func.FunctionApp()
 
@@ -401,15 +401,34 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                             response_text = response_text.replace('```json', '').replace('```', '').strip()
                         
                         try:
+                            # Additional cleanup for common JSON issues
+                            response_text = response_text.strip()
+                            if response_text.startswith('"') and response_text.endswith('"'):
+                                response_text = response_text[1:-1]  # Remove outer quotes
+                            
                             ai_result = json.loads(response_text)
+                            
+                            # Validate required fields
+                            evidence = ai_result.get('evidence', 'No evidence found')
+                            status = ai_result.get('status', 'Does Not Meet')
+                            confidence = ai_result.get('confidence', 0.0)
+                            
+                            # Ensure confidence is a number
+                            if not isinstance(confidence, (int, float)):
+                                confidence = 0.0
+                            
+                            # Validate status values
+                            valid_statuses = ['Fully Meets', 'Partially Meets', 'Does Not Meet']
+                            if status not in valid_statuses:
+                                status = 'Does Not Meet'
                             
                             sub_result = {
                                 "sub_id": sub_id,
                                 "title": sub_info['title'],
                                 "definition": sub_info['definition'],
-                                "evidence": ai_result.get('evidence', 'No evidence found'),
-                                "status": ai_result.get('status', 'Does Not Meet'),
-                                "confidence": ai_result.get('confidence', 0.0),
+                                "evidence": str(evidence),
+                                "status": status,
+                                "confidence": float(confidence),
                                 "criteria_analysis": ai_result.get('criteria_analysis', {})
                             }
                             
@@ -418,11 +437,26 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                         except json.JSONDecodeError as json_err:
                             logging.error(f"JSON parse error for {sub_id}: {str(json_err)}")
                             logging.error(f"Raw response: {response_text}")
+                            logging.error(f"Response length: {len(response_text)}")
+                            
+                            # Create a safe fallback result
                             sub_result = {
                                 "sub_id": sub_id,
                                 "title": sub_info['title'],
                                 "definition": sub_info['definition'],
-                                "evidence": "AI response parsing error",
+                                "evidence": f"AI response parsing error: {str(json_err)[:100]}",
+                                "status": "Error",
+                                "confidence": 0.0,
+                                "criteria_analysis": {}
+                            }
+                            sub_results.append(sub_result)
+                        except Exception as parse_err:
+                            logging.error(f"Unexpected parsing error for {sub_id}: {str(parse_err)}")
+                            sub_result = {
+                                "sub_id": sub_id,
+                                "title": sub_info['title'],
+                                "definition": sub_info['definition'],
+                                "evidence": f"Unexpected parsing error: {str(parse_err)[:100]}",
                                 "status": "Error",
                                 "confidence": 0.0,
                                 "criteria_analysis": {}
@@ -462,7 +496,7 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             results.append(control_result)
         
         return func.HttpResponse(
-            json.dumps({"results": results}, indent=2),
+            json.dumps({"results": results}, indent=2, ensure_ascii=False),
             status_code=200,
             mimetype="application/json",
             headers={
@@ -472,19 +506,52 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             }
         )
         
-    except Exception as e:
-        error_info = {
-            "error": f"Error processing document: {str(e)}",
-            "error_type": type(e).__name__
-        }
-        logging.error(f"Compliance check failed: {str(e)}")
+    except json.JSONEncoder as json_error:
+        logging.error(f"JSON encoding error: {str(json_error)}")
         return func.HttpResponse(
-            json.dumps(error_info),
+            json.dumps({
+                "error": "JSON encoding error in response",
+                "error_type": "JSONError",
+                "details": str(json_error)[:200]
+            }),
             status_code=500,
             mimetype="application/json",
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS", 
                 "Access-Control-Allow-Headers": "Content-Type"
             }
         )
+    except Exception as e:
+        logging.error(f"Compliance check failed: {str(e)}")
+        logging.error(f"Error type: {type(e).__name__}")
+        
+        # Ensure we return valid JSON even on error
+        try:
+            error_response = {
+                "error": f"Error processing document: {str(e)}",
+                "error_type": type(e).__name__,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            return func.HttpResponse(
+                json.dumps(error_response),
+                status_code=500,
+                mimetype="application/json",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
+            )
+        except:
+            # Last resort - return plain text error
+            return func.HttpResponse(
+                '{"error": "Critical error - unable to process request"}',
+                status_code=500,
+                mimetype="application/json",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
+            )
