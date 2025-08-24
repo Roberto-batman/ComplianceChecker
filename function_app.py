@@ -9,7 +9,43 @@ from datetime import datetime, timezone
 
 app = func.FunctionApp()
 
-# Enhanced NIST controls with detailed assessment criteria
+def determine_evidence_requirements(control_definition):
+    """
+    Analyze control definition to determine evidence requirements based on linguistic patterns.
+    
+    Pattern Recognition Rules:
+    1. "The organization..." = Organizational control - can be fully met through policy/procedures
+    2. "The information system..." = Technical control - requires system implementation evidence
+    3. Other patterns = Mixed/unclear - requires careful analysis
+    """
+    control_definition = control_definition.strip()
+    
+    if control_definition.startswith("The information system"):
+        return {
+            "type": "technical_implementation",
+            "policy_max_score": "Partially Meets",
+            "full_compliance_requires": ["system_evidence", "technical_proof", "implementation_verification"],
+            "reasoning": "Technical control requires system implementation evidence - policy alone insufficient",
+            "evidence_examples": "system configurations, screenshots, logs, audit reports, technical testing results"
+        }
+    elif control_definition.startswith("The organization"):
+        return {
+            "type": "organizational",
+            "policy_max_score": "Fully Meets",
+            "full_compliance_requires": ["policy", "procedures", "organizational_processes"],
+            "reasoning": "Organizational control can be met through documented policies and procedures",
+            "evidence_examples": "policy documents, procedures, organizational charts, training records"
+        }
+    else:
+        return {
+            "type": "mixed_or_unclear",
+            "policy_max_score": "Partially Meets",
+            "full_compliance_requires": ["contextual_analysis_needed"],
+            "reasoning": "Control type unclear from definition - requires careful evidence analysis",
+            "assessment_note": "Analyze specific control requirements to determine appropriate evidence types"
+        }
+
+# Enhanced NIST controls with pattern-based assessment
 NIST_CONTROLS = {
     "AC-1": {
         "name": "Access Control Policy and Procedures",
@@ -18,7 +54,7 @@ NIST_CONTROLS = {
         "sub_requirements": {
             "AC-1(A)(a)": {
                 "title": "Access control policy development",
-                "definition": "Develops, documents, and disseminates an access control policy that addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance",
+                "definition": "The organization develops, documents, and disseminates an access control policy that addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance",
                 "assessment_criteria": {
                     "purpose": "Look for explicit statement of why the policy exists, its objectives, or what it aims to achieve",
                     "scope": "Look for definition of what systems, users, or situations the policy covers",
@@ -31,7 +67,7 @@ NIST_CONTROLS = {
             },
             "AC-1(A)(b)": {
                 "title": "Procedures development", 
-                "definition": "Develops, documents, and disseminates procedures to facilitate the implementation of the access control policy and associated access controls",
+                "definition": "The organization develops, documents, and disseminates procedures to facilitate the implementation of the access control policy and associated access controls",
                 "assessment_criteria": {
                     "procedures_exist": "Look for step-by-step processes, workflows, or detailed instructions",
                     "implementation_focus": "Look for procedures that explain HOW to implement the policy",
@@ -41,7 +77,7 @@ NIST_CONTROLS = {
             },
             "AC-1(B)(a)": {
                 "title": "Policy review and update",
-                "definition": "Reviews and updates the current access control policy at least every 3 years",
+                "definition": "The organization reviews and updates the current access control policy at least every 3 years",
                 "assessment_criteria": {
                     "review_frequency": "Look for evidence of regular reviews, version history, or update schedules",
                     "three_year_cycle": "Check if reviews happen at least every 3 years based on document dates"
@@ -49,7 +85,7 @@ NIST_CONTROLS = {
             },
             "AC-1(B)(b)": {
                 "title": "Procedures review and update",
-                "definition": "Reviews and updates the current access control procedures at least annually",
+                "definition": "The organization reviews and updates the current access control procedures at least annually",
                 "assessment_criteria": {
                     "review_frequency": "Look for evidence of regular reviews, version history, or update schedules",
                     "annual_cycle": "Check if reviews happen at least annually based on document dates"
@@ -198,75 +234,68 @@ NIST_CONTROLS = {
                     "system_implementation": "Evidence of actual system configurations, not just policy statements",
                     "authorization_verification": "Proof that systems check authorizations before granting access",
                     "policy_alignment": "Evidence that technical controls match stated policies"
-                },
-                "assessment_guidance": "This requirement focuses on SYSTEM enforcement, not just policy existence. Policy documents alone can only achieve 'Partially Meets' unless they include evidence of technical implementation such as: system configurations, access logs, technical controls, automated enforcement mechanisms, or proof of system testing."
+                }
             }
         }
     }
 }
 
-def create_enhanced_prompt(sub_id, sub_info, control_info, document_text, current_date):
-    """Create a detailed, criteria-based assessment prompt"""
+def create_pattern_based_prompt(sub_id, sub_info, control_info, document_text, current_date):
+    """Create assessment prompt incorporating pattern-based evidence requirements"""
     
-    # Get assessment criteria if available
-    criteria = sub_info.get('assessment_criteria', {})
+    # Determine evidence requirements based on control definition
+    evidence_req = determine_evidence_requirements(sub_info['definition'])
     
     base_prompt = f"""
 Today's date is {current_date}.
 
-You are analyzing compliance with NIST sub-requirement {sub_id}: {sub_info['title']}.
+COMPLIANCE ASSESSMENT for {sub_id}: {sub_info['title']}
 
 Sub-requirement definition: {sub_info['definition']}
 
-Parent control {sub_id.split('(')[0]}: {control_info['title']}
-
-CRITICAL ASSESSMENT INSTRUCTIONS:
-1. SYSTEMATIC EVIDENCE SEARCH: Look systematically through the document for ALL components
-2. POSITIVE EVIDENCE BIAS: If evidence exists for the requirement, lean toward "Fully Meets" unless clearly incomplete
-3. COMPONENT BREAKDOWN: For complex requirements with multiple parts, check each component individually
-4. DIRECT QUOTES REQUIRED: Always provide specific quoted text from the document as evidence
+PATTERN-BASED ASSESSMENT RULES:
+Control Type: {evidence_req['type']}
+Reasoning: {evidence_req['reasoning']}
+Policy Document Maximum Score: {evidence_req['policy_max_score']}
+Required Evidence Types: {', '.join(evidence_req['full_compliance_requires'])}
+Evidence Examples: {evidence_req.get('evidence_examples', 'Various forms of supporting documentation')}
 
 """
 
+    # Add assessment note if present
+    if 'assessment_note' in evidence_req:
+        base_prompt += f"Special Note: {evidence_req['assessment_note']}\n\n"
+
+    # Get assessment criteria if available
+    criteria = sub_info.get('assessment_criteria', {})
+    
     if criteria:
-        base_prompt += f"""
-SPECIFIC CRITERIA TO CHECK for {sub_id}:
-"""
+        base_prompt += f"SPECIFIC CRITERIA TO CHECK:\n"
         for criterion, description in criteria.items():
             base_prompt += f"• {criterion.upper()}: {description}\n"
-        
-        # Add special assessment guidance if available
-        if 'assessment_guidance' in sub_info:
-            base_prompt += f"""
-SPECIAL ASSESSMENT GUIDANCE for {sub_id}:
-{sub_info['assessment_guidance']}
-
-"""
-        
-        base_prompt += """
-ASSESSMENT LOGIC:
-- If 80-100% of criteria have evidence → "Fully Meets" 
-- If 50-79% of criteria have evidence → "Partially Meets"
-- If less than 50% of criteria have evidence → "Does Not Meet"
-
-"""
+        base_prompt += "\n"
 
     base_prompt += f"""
-DOCUMENT TEXT TO ANALYZE:
+ASSESSMENT INSTRUCTIONS:
+1. Analyze the document systematically for evidence related to this requirement
+2. Consider the control type when determining compliance level
+3. For technical controls: Policy alone = maximum "Partially Meets"
+4. For organizational controls: Policy/procedures can achieve "Fully Meets"
+5. Quote specific evidence from the document
+
+DOCUMENT TO ANALYZE:
 {document_text[:8000]}
 
-REQUIRED JSON RESPONSE FORMAT:
+REQUIRED JSON RESPONSE:
 {{
-    "evidence": "Direct quotes from document that support this requirement (be thorough and specific)",
-    "status": "Fully Meets" | "Partially Meets" | "Does Not Meet",
+    "evidence": "Direct quotes from document with page references",
+    "status": "Fully Meets" | "Partially Meets" | "Does Not Meet", 
     "confidence": 0.0-1.0,
-    "criteria_analysis": {{
-        "components_found": ["list of requirement components found in document"],
-        "missing_components": ["list of requirement components not found"]
-    }}
+    "assessment_reasoning": "Explanation of why this score was assigned based on control type and evidence found",
+    "evidence_type_analysis": "What types of evidence were found (policy, technical, procedural, etc.)"
 }}
 
-IMPORTANT: Be thorough in finding evidence. If the document contains the required elements, assess as "Fully Meets" even if the wording isn't perfect.
+Remember: Apply pattern-based rules consistently. Technical implementation controls require more than policy evidence for full compliance.
 """
     
     return base_prompt
@@ -315,9 +344,83 @@ def calculate_overall_confidence(sub_results):
     
     return weighted_sum / total_weight
 
+# Warmup endpoint to prevent cold starts
+@app.route(route="warmup", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
+def warmup(req: func.HttpRequest) -> func.HttpResponse:
+    """Simple warmup endpoint to keep function active"""
+    logging.info('Warmup endpoint called - function staying active')
+    
+    # Test basic connectivity
+    try:
+        # Test environment variables
+        endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
+        api_key = os.environ.get('AZURE_OPENAI_KEY')
+        deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT')
+        
+        warmup_response = {
+            "status": "warm",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "environment_check": {
+                "endpoint_configured": bool(endpoint),
+                "api_key_configured": bool(api_key),
+                "deployment_configured": bool(deployment)
+            }
+        }
+        
+        return func.HttpResponse(
+            json.dumps(warmup_response),
+            status_code=200,
+            mimetype="application/json",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            }
+        )
+    except Exception as e:
+        logging.error(f"Warmup failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"status": "warmup_failed", "error": str(e)}),
+            status_code=500,
+            mimetype="application/json",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            }
+        )
+
 @app.route(route="ComplianceChecker", auth_level=func.AuthLevel.ANONYMOUS)
 def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('NIST Enhanced Compliance Checker triggered')
+    """Enhanced NIST compliance checker with pattern-based assessment"""
+    
+    # Startup logging for diagnostics
+    logging.info('=== NIST Compliance Checker Starting ===')
+    logging.info(f'Function invocation ID: {req.url}')
+    logging.info('Checking environment variables...')
+    
+    endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
+    api_key = os.environ.get('AZURE_OPENAI_KEY')
+    deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT')
+    api_version = os.environ.get('AZURE_OPENAI_API_VERSION')
+    
+    logging.info(f'Endpoint configured: {bool(endpoint)}')
+    logging.info(f'API key configured: {bool(api_key)}')
+    logging.info(f'Deployment configured: {bool(deployment)}')
+    logging.info(f'API version configured: {bool(api_version)}')
+    
+    if not all([endpoint, api_key, deployment]):
+        logging.error('Missing required environment variables')
+        return func.HttpResponse(
+            json.dumps({"error": "Azure OpenAI configuration incomplete"}),
+            status_code=500,
+            mimetype="application/json",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            }
+        )
     
     try:
         # Get uploaded file
@@ -337,6 +440,8 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
         pdf_file = files['document']
         pdf_content = pdf_file.read()
         
+        logging.info(f'Processing PDF file: {pdf_file.filename} ({len(pdf_content)} bytes)')
+        
         # Extract text from PDF
         reader = PdfReader(io.BytesIO(pdf_content))
         text_content = ""
@@ -345,21 +450,23 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
             page_text = page.extract_text()
             text_content += f"\n--- Page {page_num + 1} ---\n{page_text}"
         
-        logging.info(f"Extracted {len(text_content)} characters from PDF")
+        logging.info(f"Extracted {len(text_content)} characters from {len(reader.pages)} pages")
         
         # Initialize Azure OpenAI client
+        logging.info('Initializing Azure OpenAI client...')
         client = AzureOpenAI(
-            api_version=os.environ.get('AZURE_OPENAI_API_VERSION'),
-            azure_endpoint=os.environ.get('AZURE_OPENAI_ENDPOINT'),
-            api_key=os.environ.get('AZURE_OPENAI_KEY')
+            api_version=api_version,
+            azure_endpoint=endpoint,
+            api_key=api_key
         )
+        logging.info('Azure OpenAI client initialized successfully')
         
         results = []
         current_date = datetime.now().strftime('%B %d, %Y')
         
         # Process each NIST control
         for control_id, control_info in NIST_CONTROLS.items():
-            logging.info(f"Analyzing control {control_id}")
+            logging.info(f"=== Analyzing control {control_id}: {control_info['title']} ===")
             
             control_result = {
                 "control_id": control_id,
@@ -376,25 +483,27 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                 sub_results = []
                 
                 for sub_id, sub_info in control_info['sub_requirements'].items():
-                    logging.info(f"  Analyzing sub-requirement {sub_id}")
+                    logging.info(f"  → Analyzing sub-requirement {sub_id}")
                     
                     try:
-                        # Create enhanced prompt
-                        prompt = create_enhanced_prompt(sub_id, sub_info, control_info, text_content, current_date)
+                        # Create pattern-based prompt
+                        prompt = create_pattern_based_prompt(sub_id, sub_info, control_info, text_content, current_date)
+                        
+                        logging.info(f"  → Calling Azure OpenAI for {sub_id}")
                         
                         # Call Azure OpenAI for sub-requirement
                         ai_response = client.chat.completions.create(
-                            model=os.environ.get('AZURE_OPENAI_DEPLOYMENT'),
+                            model=deployment,
                             messages=[
-                                {"role": "system", "content": "You are a thorough NIST compliance expert. Look systematically for evidence and be generous in finding compliance when evidence exists. Respond only with valid JSON."},
+                                {"role": "system", "content": "You are a NIST compliance expert who applies pattern-based assessment rules consistently. Always consider control type when determining maximum possible compliance level."},
                                 {"role": "user", "content": prompt}
                             ],
-                            max_tokens=1200,
+                            max_tokens=1500,
                             temperature=0.1
                         )
                         
                         response_text = ai_response.choices[0].message.content.strip()
-                        logging.info(f"AI response for {sub_id}: {response_text[:200]}...")
+                        logging.info(f"  → AI response received for {sub_id} ({len(response_text)} chars)")
                         
                         # Clean up response
                         if response_text.startswith('```json'):
@@ -429,15 +538,16 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                                 "evidence": str(evidence),
                                 "status": status,
                                 "confidence": float(confidence),
-                                "criteria_analysis": ai_result.get('criteria_analysis', {})
+                                "assessment_reasoning": ai_result.get('assessment_reasoning', 'No reasoning provided'),
+                                "evidence_type_analysis": ai_result.get('evidence_type_analysis', 'No analysis provided')
                             }
                             
                             sub_results.append(sub_result)
+                            logging.info(f"  → {sub_id} assessed as: {status} (confidence: {confidence})")
                             
                         except json.JSONDecodeError as json_err:
-                            logging.error(f"JSON parse error for {sub_id}: {str(json_err)}")
-                            logging.error(f"Raw response: {response_text}")
-                            logging.error(f"Response length: {len(response_text)}")
+                            logging.error(f"  → JSON parse error for {sub_id}: {str(json_err)}")
+                            logging.error(f"  → Raw response: {response_text[:200]}...")
                             
                             # Create a safe fallback result
                             sub_result = {
@@ -447,11 +557,12 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                                 "evidence": f"AI response parsing error: {str(json_err)[:100]}",
                                 "status": "Error",
                                 "confidence": 0.0,
-                                "criteria_analysis": {}
+                                "assessment_reasoning": "JSON parsing failed",
+                                "evidence_type_analysis": "Error in processing"
                             }
                             sub_results.append(sub_result)
                         except Exception as parse_err:
-                            logging.error(f"Unexpected parsing error for {sub_id}: {str(parse_err)}")
+                            logging.error(f"  → Unexpected parsing error for {sub_id}: {str(parse_err)}")
                             sub_result = {
                                 "sub_id": sub_id,
                                 "title": sub_info['title'],
@@ -459,20 +570,22 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                                 "evidence": f"Unexpected parsing error: {str(parse_err)[:100]}",
                                 "status": "Error",
                                 "confidence": 0.0,
-                                "criteria_analysis": {}
+                                "assessment_reasoning": "Parsing error occurred",
+                                "evidence_type_analysis": "Error in processing"
                             }
                             sub_results.append(sub_result)
                         
                     except Exception as sub_error:
-                        logging.error(f"Error processing sub-requirement {sub_id}: {str(sub_error)}")
+                        logging.error(f"  → Error processing sub-requirement {sub_id}: {str(sub_error)}")
                         sub_result = {
                             "sub_id": sub_id,
                             "title": sub_info['title'],
                             "definition": sub_info['definition'],
-                            "evidence": f"Processing error: {str(sub_error)}",
+                            "evidence": f"Processing error: {str(sub_error)[:100]}",
                             "status": "Error",
                             "confidence": 0.0,
-                            "criteria_analysis": {}
+                            "assessment_reasoning": "Processing error occurred",
+                            "evidence_type_analysis": "Error in processing"
                         }
                         sub_results.append(sub_result)
                 
@@ -492,8 +605,12 @@ def ComplianceChecker(req: func.HttpRequest) -> func.HttpResponse:
                     control_result["overall_evidence"] = " | ".join(evidence_pieces[:2])  # Top 2 pieces
                 
                 control_result["sub_requirements"] = sub_results
+                
+                logging.info(f"=== Control {control_id} overall status: {control_result['overall_status']} ===")
             
             results.append(control_result)
+        
+        logging.info(f'=== Assessment complete - processed {len(results)} controls ===')
         
         return func.HttpResponse(
             json.dumps({"results": results}, indent=2, ensure_ascii=False),
